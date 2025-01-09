@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Web Page with Chat</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+        }
+
+        /* Background Video */
+        .background-video {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: -1;
+        }
+
+        /* Canvas Area */
+        canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+
+        /* Chat Box Area */
+        .chat-box {
+            position: absolute;
+            bottom: 5%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(255, 255, 255, 0.9);
+            border-radius: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            width: 90%;
+            max-width: 600px;
+            padding: 20px;
+            z-index: 1;
+        }
+
+        .chat-box-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .chat-box-header h2 {
+            font-size: 18px;
+            color: #333;
+        }
+
+        .chat-box-header .close-btn {
+            background: none;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .chat-box-header .close-btn:hover {
+            color: #333;
+        }
+
+        .messages {
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+
+        .messages::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .messages::-webkit-scrollbar-thumb {
+            background-color: #ccc;
+            border-radius: 4px;
+        }
+
+        .message {
+            display: flex;
+            margin-bottom: 10px;
+        }
+
+        .message.user {
+            justify-content: flex-start;
+        }
+
+        .message.kimi {
+            justify-content: flex-end;
+        }
+
+        .message .bubble {
+            max-width: 75%;
+            padding: 10px 15px;
+            border-radius: 15px;
+            line-height: 1.4;
+        }
+
+        .message.user .bubble {
+            background-color: #007BFF;
+            color: white;
+            border-radius: 15px 15px 15px 5px;
+        }
+
+        .message.kimi .bubble {
+            background-color: #E9ECEF;
+            color: #333;
+            border-radius: 15px 15px 5px 15px;
+        }
+
+        .input-area {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .input-area input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 20px;
+            outline: none;
+        }
+
+        .input-area button {
+            padding: 10px 20px;
+            background-color: #007BFF;
+            border: none;
+            color: white;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+
+        .input-area button:hover {
+            background-color: #0056b3;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .chat-box {
+                width: 95%;
+            }
+        }
+
+        .open-chat-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            display: none;
+            z-index: 1;
+        }
+
+        .open-chat-btn:hover {
+            background-color: #0056b3;
+        }
+
+        .fortune-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background-color: #ff6b6b;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            z-index: 1;
+        }
+
+        .fortune-btn:hover {
+            background-color: #ff5252;
+        }
+
+        .toast-message {
+            position: fixed;
+            padding: 8px 16px;
+            background: linear-gradient(135deg, #ff6b6b, #ff8e8e);
+            color: white;
+            border-radius: 20px;
+            font-size: 18px;
+            pointer-events: none;
+            animation: fadeOut 0.8s ease-in-out forwards;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            z-index: 2;
+        }
+
+        @keyframes fadeOut {
+            0% {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+            20% {
+                opacity: 1;
+                transform: scale(1.1);
+            }
+            40% {
+                transform: scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Background Video -->
+    <video class="background-video" autoplay muted loop>
+        <source src="82.mp4" type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
+
+    <!-- Canvas for Animation -->
+    <canvas id="animation-canvas"></canvas>
+
+    <!-- Chat Box -->
+    <div class="chat-box">
+        <div class="chat-box-header">
+            <h2>Chat with Kimi</h2>
+            <button class="close-btn">&times;</button>
+        </div>
+        <div class="messages" id="messages">
+            <!-- Messages will be appended here -->
+        </div>
+        <div class="input-area">
+            <input type="text" id="user-input" placeholder="Type your message...">
+            <button id="send-btn">Send</button>
+        </div>
+    </div>
+
+    <button class="open-chat-btn" id="open-chat-btn">Open Chat</button>
+    <button class="fortune-btn" id="fortune-btn">求签</button>
+    <div class="toast-message" id="toast-message"></div>
+
+    <script>
+        // Canvas Animation
+        const canvas = document.getElementById('animation-canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        const API_URL = 'https://api.moonshot.cn/v1/chat/completions';
+        const API_KEY = 'sk-HgkCiPLhu6rNF8IEmgdqoAfOwvZcxeLclWy6SXJnduaqw5Ty'; // 你的密钥
+        let particlesArray = [];
+
+        class Particle {
+            constructor(x, y, size, color, velocityX, velocityY) {
+                this.x = x;
+                this.y = y;
+                this.size = size;
+                this.color = color;
+                this.velocityX = velocityX;
+                this.velocityY = velocityY;
+                this.alpha = 1;
+                this.life = 1;
+                this.angle = Math.random() * Math.PI * 2;
+                this.rotationSpeed = (Math.random() - 0.5) * 0.1;
+            }
+
+            update() {
+                this.x += this.velocityX;
+                this.y += this.velocityY;
+                
+                this.angle += this.rotationSpeed;
+                this.velocityX = Math.cos(this.angle) * 2;
+                this.velocityY = Math.sin(this.angle) * 2;
+                
+                if (this.size > 0.2) this.size -= 0.05;
+                this.life -= 0.008;
+                this.alpha = this.life;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        function handleParticles() {
+            for (let i = 0; i < particlesArray.length; i++) {
+                particlesArray[i].update();
+                particlesArray[i].draw();
+
+                if (particlesArray[i].size <= 0.2) {
+                    particlesArray.splice(i, 1);
+                    i--;
+                }
+            }
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 1. 更新和绘制雪花
+            snowflakes.forEach(snowflake => {
+                snowflake.update();
+                snowflake.draw();
+            });
+            
+            // 2. 更新和绘制鼠标移动粒子
+            handleParticles();
+            
+            // 3. 更新和绘制3D粒子
+            const isMoving = Math.abs(mouseX - lastMouseX) > 0.1 || Math.abs(mouseY - lastMouseY) > 0.1;
+            particles3D.forEach(particle => {
+                particle.update(mouseX, mouseY, isMoving);
+                particle.draw(ctx);
+            });
+            
+            lastMouseX = mouseX;
+            lastMouseY = mouseY;
+            
+            requestAnimationFrame(animate);
+        }
+
+        // Chat Functionality
+        const sendButton = document.getElementById('send-btn');
+        const userInput = document.getElementById('user-input');
+        const messages = document.getElementById('messages');
+        const closeBtn = document.querySelector('.close-btn');
+        const chatBox = document.querySelector('.chat-box');
+
+        async function getResponseFromKimi(userMessage) {
+            try {
+                // 创建消息历史数组
+                const messageHistory = [
+                    {
+                        role: "system",
+                        content: "你是 Kimi，由 Moonshot AI 提供的人工智能助手，你更擅长中文和英文的对话。你会为用户提供安全，有帮助，准确的回答。"
+                    }
+                ];
+
+                // 添加用户消息
+                messageHistory.push({
+                    role: "user",
+                    content: userMessage
+                });
+
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${API_KEY}`
+                    },
+                    body: JSON.stringify({
+                        model: "moonshot-v1-8k",
+                        messages: messageHistory,
+                        temperature: 0.7,
+                        max_tokens: 2000,
+                        top_p: 0.95,
+                        frequency_penalty: 0,
+                        presence_penalty: 0
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error('API Error:', errorData);
+                    
+                    // 根据不同的错误状态返回不同的消息
+                    if (response.status === 429) {
+                        throw new Error('rate_limit_exceeded');
+                    } else if (response.status === 401) {
+                        throw new Error('unauthorized');
+                    } else {
+                        throw new Error(errorData.error?.message || 'unknown_error');
+                    }
+                }
+
+                const data = await response.json();
+                if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+                    throw new Error('invalid_response');
+                }
+
+                return data.choices[0].message.content;
+            } catch (error) {
+                console.error('Error details:', error);
+                
+                // 根据错误类型返回更具体的错误信息
+                switch(error.message) {
+                    case 'rate_limit_exceeded':
+                        return "抱歉，当前请求较多，请等待几秒后再试。";
+                    case 'unauthorized':
+                        return "API 密钥验证失败，请检查密钥是否正确。";
+                    case 'invalid_response':
+                        return "服务器返回的数据格式有误，请重试。";
+                    default:
+                        // 如果是网络错误，给出更明确的提示
+                        if (error instanceof TypeError && error.message.includes('fetch')) {
+                            return "网络连接出现问题，请检查网络后重试。";
+                        }
+                        return "抱歉，出现了一些问题，请稍后重试。";
+                }
+            }
+        }
+
+        async function sendMessageWithRetry(userMessage, maxRetries = 3) {
+            let lastError = null;
+            
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await getResponseFromKimi(userMessage);
+                    if (!response.includes("抱歉") || !response.includes("错误")) {
+                        return response;
+                    }
+                    // 增加重试间隔时间
+                    await new Promise(resolve => setTimeout(resolve, 2000 * (i + 1)));
+                } catch (error) {
+                    console.error(`Retry ${i + 1} failed:`, error);
+                    lastError = error;
+                    // 如果是认证错误，立即停止重试
+                    if (error.message === 'unauthorized') {
+                        break;
+                    }
+                }
+            }
+
+            // 返回最后一次错误的具体信息
+            return lastError?.message || "非常抱歉，多次尝试后仍无法获得响应，请稍后再试。";
+        }
+
+        function addMessage(content, sender) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', sender);
+            const bubbleDiv = document.createElement('div');
+            bubbleDiv.classList.add('bubble');
+            bubbleDiv.textContent = content;
+            messageDiv.appendChild(bubbleDiv);
+            messages.appendChild(messageDiv);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        sendButton.addEventListener('click', async () => {
+            const userMessage = userInput.value.trim();
+            if (userMessage === '') return;
+            
+            // 禁用发送按钮，防止重复发送
+            sendButton.disabled = true;
+            userInput.disabled = true;
+            
+            try {
+                addMessage(userMessage, 'user');
+                userInput.value = '';
+                
+                const kimiResponse = await sendMessageWithRetry(userMessage);
+                addMessage(kimiResponse, 'kimi');
+            } catch (error) {
+                console.error('Send message error:', error);
+                addMessage("消息发送失败，请重试。", 'kimi');
+            } finally {
+                // 恢复按钮和输入框
+                sendButton.disabled = false;
+                userInput.disabled = false;
+                userInput.focus();
+            }
+        });
+
+        userInput.addEventListener('keypress', async (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                sendButton.click();
+            }
+        });
+
+        closeBtn.addEventListener('click', () => {
+            chatBox.style.display = 'none';
+        });
+
+        // Ensure canvas resizes dynamically
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const chatBox = document.querySelector('.chat-box');
+            const openChatBtn = document.getElementById('open-chat-btn');
+            const closeBtn = document.querySelector('.close-btn');
+
+            // 关闭聊天窗口
+            closeBtn.addEventListener('click', () => {
+                chatBox.style.display = 'none';
+                openChatBtn.style.display = 'block';
+            });
+
+            // 打开聊天窗口
+            openChatBtn.addEventListener('click', () => {
+                chatBox.style.display = 'block';
+                openChatBtn.style.display = 'none';
+            });
+        });
+
+        // 处理点击无效区域
+        document.addEventListener('click', (event) => {
+            const chatBox = document.querySelector('.chat-box');
+            const openChatBtn = document.getElementById('open-chat-btn');
+            const fortuneBtn = document.getElementById('fortune-btn');
+            
+            if (!chatBox.contains(event.target) && 
+                event.target !== openChatBtn && 
+                event.target !== fortuneBtn) {
+                showToast('Good', event.clientX, event.clientY);
+            }
+        });
+
+        // 显示提示消息
+        function showToast(message, x, y) {
+            const toast = document.getElementById('toast-message');
+            toast.textContent = message;
+            toast.style.left = x + 'px';
+            toast.style.top = y + 'px';
+            toast.style.display = 'block';
+            toast.style.opacity = '1';
+            
+            for (let i = 0; i < 15; i++) {
+                const angle = (i / 15) * Math.PI * 2;
+                const speed = Math.random() * 2 + 1;
+                const size = Math.random() * 3 + 2;
+                const spread = 25;
+                
+                const randomX = x + (Math.random() - 0.5) * spread;
+                const randomY = y + (Math.random() - 0.5) * spread;
+                
+                const colorTypes = [
+                    `hsla(${Math.random() * 360}, 70%, 60%, 0.8)`,
+                    `hsla(${Math.random() * 60 + 180}, 80%, 60%, 0.8)`,
+                    `hsla(${Math.random() * 60 + 300}, 80%, 70%, 0.8)`,
+                    `hsla(${Math.random() * 60}, 80%, 60%, 0.8)`,
+                ];
+                const color = colorTypes[Math.floor(Math.random() * colorTypes.length)];
+                
+                particlesArray.push(
+                    new Particle(
+                        randomX,
+                        randomY,
+                        size,
+                        color,
+                        Math.cos(angle) * speed,
+                        Math.sin(angle) * speed
+                    )
+                );
+            }
+
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 800);
+        }
+
+        // 求签功能
+        const fortuneResults = [
+            "大吉 - 前程似锦，万事如意",
+            "中吉 - 稳步向前，平安顺遂",
+            "小吉 - 渐入佳境，保持耐心",
+            "平签 - 波澜不惊，平稳发展",
+            "末吉 - 谨慎行事，静待时机"
+        ];
+
+        document.getElementById('fortune-btn').addEventListener('click', () => {
+            const result = fortuneResults[Math.floor(Math.random() * fortuneResults.length)];
+            showToast(result);
+        });
+
+        // 在现有代码后添加新的三维粒子系统
+        class Particle3D {
+            constructor(x, y, z) {
+                this.x = x;
+                this.y = y;
+                this.z = z;
+                this.size = Math.random() * 2 + 1;
+                this.targetX = x;
+                this.targetY = y;
+                this.targetZ = z;
+                this.vx = 0;
+                this.vy = 0;
+                this.vz = 0;
+                this.rotationSpeed = 0;
+                this.angle = Math.random() * Math.PI * 2;
+                this.color = `hsla(${Math.random() * 360}, 70%, 60%, 0.8)`;
+                this.baseSpeed = 0.002; // 添加基础旋转速度
+            }
+
+            update(mouseX, mouseY, isMoving) {
+                if (isMoving) {
+                    // 跟随鼠标移动
+                    this.targetX = mouseX + (Math.cos(this.angle) * 100);
+                    this.targetY = mouseY + (Math.sin(this.angle) * 100);
+                    this.rotationSpeed *= 0.95;
+                } else {
+                    // 旋转效果
+                    this.rotationSpeed += this.baseSpeed; // 使用较小的基础速度
+                    this.rotationSpeed = Math.min(this.rotationSpeed, 0.02); // 限制最大旋转速度
+                    this.angle += this.rotationSpeed;
+                    
+                    // 使用较小的系数来减缓运动
+                    const radius = 80 + Math.sin(this.angle * 0.5) * 30;
+                    this.targetX = mouseX + Math.cos(this.angle) * radius;
+                    this.targetY = mouseY + Math.sin(this.angle) * radius;
+                }
+
+                // 降低移动速度
+                this.vx = (this.targetX - this.x) * 0.05;
+                this.vy = (this.targetY - this.y) * 0.05;
+                this.vz = (this.targetZ - this.z) * 0.05;
+
+                this.x += this.vx;
+                this.y += this.vy;
+                this.z += this.vz;
+            }
+
+            draw(ctx) {
+                const scale = (1000 / (1000 + this.z));
+                const x = this.x * scale;
+                const y = this.y * scale;
+                const size = this.size * scale;
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(x, y, size, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.globalAlpha = scale * 0.8;
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        // 创建3D粒子系统
+        const particles3D = [];
+        const PARTICLES_COUNT = 100;
+
+        // 初始化3D粒子
+        function initParticles3D() {
+            for (let i = 0; i < PARTICLES_COUNT; i++) {
+                const angle = (i / PARTICLES_COUNT) * Math.PI * 2;
+                const radius = 100;
+                particles3D.push(new Particle3D(
+                    canvas.width / 2 + Math.cos(angle) * radius,
+                    canvas.height / 2 + Math.sin(angle) * radius,
+                    Math.random() * 200 - 100
+                ));
+            }
+        }
+
+        // 修改现有的 animate 函数
+        let lastMouseX = 0;
+        let lastMouseY = 0;
+        let isMouseMoving = false;
+        let mouseX = canvas.width / 2;
+        let mouseY = canvas.height / 2;
+
+        function animate3D() {
+            // 不要清除画布，因为 animateParticles 已经清除了
+            
+            // 更新和绘制3D粒子
+            const isMoving = Math.abs(mouseX - lastMouseX) > 0.1 || Math.abs(mouseY - lastMouseY) > 0.1;
+            particles3D.forEach(particle => {
+                particle.update(mouseX, mouseY, isMoving);
+                particle.draw(ctx);
+            });
+            
+            lastMouseX = mouseX;
+            lastMouseY = mouseY;
+            
+            requestAnimationFrame(animate3D);
+        }
+
+        // 修改雪花参数使其更明显
+        class Snowflake {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = -10;
+                this.size = Math.random() * 8 + 4; // 调整大小范围
+                this.speedX = Math.random() * 2 - 1;
+                this.speedY = Math.random() * 0.5 + 0.3;
+                this.opacity = Math.random() * 0.7 + 0.3;
+                this.swing = 0;
+                this.swingSpeed = Math.random() * 0.02;
+                this.rotation = Math.random() * Math.PI * 2;
+                this.rotationSpeed = (Math.random() - 0.5) * 0.02;
+                this.snowflakePath = this.createSnowflakePath();
+            }
+
+            createSnowflakePath() {
+                const path = new Path2D();
+                
+                // 创建六角雪花的主要分支
+                for (let i = 0; i < 6; i++) {
+                    const angle = (Math.PI * 2 / 6) * i;
+                    const mainLength = this.size;
+                    const x1 = Math.cos(angle) * mainLength;
+                    const y1 = Math.sin(angle) * mainLength;
+                    
+                    // 主干
+                    path.moveTo(0, 0);
+                    path.lineTo(x1, y1);
+                    
+                    // 添加分支
+                    const branchLength = mainLength * 0.5;
+                    const branchAngle = Math.PI / 3; // 60度
+                    
+                    // 左分支
+                    const leftBranchX = x1 * 0.5 + Math.cos(angle - branchAngle) * branchLength;
+                    const leftBranchY = y1 * 0.5 + Math.sin(angle - branchAngle) * branchLength;
+                    path.moveTo(x1 * 0.5, y1 * 0.5);
+                    path.lineTo(leftBranchX, leftBranchY);
+                    
+                    // 右分支
+                    const rightBranchX = x1 * 0.5 + Math.cos(angle + branchAngle) * branchLength;
+                    const rightBranchY = y1 * 0.5 + Math.sin(angle + branchAngle) * branchLength;
+                    path.moveTo(x1 * 0.5, y1 * 0.5);
+                    path.lineTo(rightBranchX, rightBranchY);
+                    
+                    // 添加装饰点
+                    path.arc(x1 * 0.7, y1 * 0.7, this.size * 0.1, 0, Math.PI * 2);
+                    path.arc(leftBranchX * 0.8, leftBranchY * 0.8, this.size * 0.08, 0, Math.PI * 2);
+                    path.arc(rightBranchX * 0.8, rightBranchY * 0.8, this.size * 0.08, 0, Math.PI * 2);
+                }
+                
+                // 添加中心装饰
+                path.arc(0, 0, this.size * 0.15, 0, Math.PI * 2);
+                
+                return path;
+            }
+
+            update() {
+                this.swing += this.swingSpeed;
+                this.x += Math.sin(this.swing) * 0.5 + this.speedX * 0.3;
+                this.y += this.speedY;
+                this.rotation += this.rotationSpeed;
+
+                if (this.y > canvas.height + 10) {
+                    this.y = -10;
+                    this.x = Math.random() * canvas.width;
+                }
+
+                if (this.x > canvas.width + 10) {
+                    this.x = -10;
+                } else if (this.x < -10) {
+                    this.x = canvas.width + 10;
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+                ctx.globalAlpha = this.opacity;
+                
+                // 绘制发光效果
+                ctx.shadowColor = 'rgba(255, 255, 255, 0.8)';
+                ctx.shadowBlur = 5;
+                
+                // 绘制雪花轮廓
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+                ctx.lineWidth = this.size * 0.05;
+                ctx.stroke(this.snowflakePath);
+                
+                // 绘制雪花填充
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                ctx.fill(this.snowflakePath);
+                
+                ctx.restore();
+            }
+        }
+
+        // 创建雪花数组
+        const snowflakes = [];
+        const SNOWFLAKE_COUNT = 100; // 减少数量以提高性能
+
+        // 初始化雪花
+        function initSnowflakes() {
+            for (let i = 0; i < SNOWFLAKE_COUNT; i++) {
+                snowflakes.push(new Snowflake());
+                // 随机分布在整个画布上
+                snowflakes[i].y = Math.random() * canvas.height;
+            }
+        }
+
+        // 修改鼠标移动事件监听器，增加粒子效果
+        window.addEventListener('mousemove', (event) => {
+            mouseX = event.x;
+            mouseY = event.y;
+            isMouseMoving = true;
+            
+            // 生成更多的鼠标移动粒子
+            for (let i = 0; i < 5; i++) {
+                const size = Math.random() * 3 + 1;
+                const speed = Math.random() * 2 + 1;
+                const angle = Math.random() * Math.PI * 2;
+                const spread = 40;
+                
+                const randomX = event.x + (Math.random() - 0.5) * spread;
+                const randomY = event.y + (Math.random() - 0.5) * spread;
+                
+                // 使用更丰富的颜色
+                const colorTypes = [
+                    `hsla(${Math.random() * 360}, 80%, 60%, 0.8)`,  // 随机色相
+                    `hsla(${Math.random() * 60 + 180}, 90%, 60%, 0.8)`,  // 蓝色系
+                    `hsla(${Math.random() * 60 + 300}, 90%, 70%, 0.8)`,  // 紫色系
+                    `hsla(${Math.random() * 60}, 90%, 60%, 0.8)`,  // 红黄系
+                    `hsla(${Math.random() * 60 + 120}, 90%, 60%, 0.8)`,  // 绿色系
+                ];
+                const color = colorTypes[Math.floor(Math.random() * colorTypes.length)];
+                
+                particlesArray.push(
+                    new Particle(
+                        randomX,
+                        randomY,
+                        size,
+                        color,
+                        Math.cos(angle) * speed,
+                        Math.sin(angle) * speed
+                    )
+                );
+            }
+        });
+
+        // 删除其他的 animate 调用，只保留这一个初始化
+        initSnowflakes();
+        initParticles3D();
+        animate(); // 只调用一次主动画循环
+
+        // 添加鼠标离开画布的处理
+        canvas.addEventListener('mouseleave', () => {
+            mouseX = canvas.width / 2;
+            mouseY = canvas.height / 2;
+        });
+
+        // 当窗口大小改变时，更新雪花位置
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            // 重新初始化雪花
+            snowflakes.length = 0;
+            initSnowflakes();
+        });
+    </script>
+</body>
+</html>
